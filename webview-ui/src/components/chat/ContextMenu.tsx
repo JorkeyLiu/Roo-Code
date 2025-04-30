@@ -1,47 +1,49 @@
-import React, { useEffect, useRef } from "react" // Remove useMemo
+import React, { useEffect, useRef, useState } from "react" // Hide built-in mode: Remove useMemo
 import {
 	ContextMenuOptionType,
 	ContextMenuQueryItem,
-	// getContextMenuOptions, // Remove unused import
-	// SearchResult, // Remove unused import
-} from "../../utils/context-mentions"
+	// getContextMenuOptions, // Hide built-in mode: Remove unused import
+	// SearchResult, // Hide built-in mode: Remove unused import
+} from "@src/utils/context-mentions"
 import { removeLeadingNonAlphanumeric } from "../common/CodeAccordian"
-// import { ModeConfig } from "../../../../src/shared/modes" // Remove unused import
+// import { ModeConfig } from "@roo/shared/modes" // Hide built-in mode: Remove unused import
+import { getIconForFilePath, getIconUrlByName, getIconForDirectoryPath } from "vscode-material-icons"
 
 interface ContextMenuProps {
 	onSelect: (type: ContextMenuOptionType, value?: string) => void
-	// Remove props related to calculation, as options are now passed in
-	// searchQuery: string
+	// Hide built-in mode: Remove props related to calculation, as options are now passed in
+	// Hide built-in mode: Remove searchQuery: string
 	onMouseDown: () => void
 	selectedIndex: number
 	setSelectedIndex: (index: number) => void
-	// selectedType: ContextMenuOptionType | null
-	// queryItems: ContextMenuQueryItem[]
-	// modes?: ModeConfig[]
-	loading?: boolean // Keep loading prop
-	// dynamicSearchResults?: SearchResult[]
+	// selectedType: ContextMenuOptionType | null // Hide built-in mode: Removed
+	// queryItems: ContextMenuQueryItem[] // Hide built-in mode: Removed
+	// modes?: ModeConfig[] // Hide built-in mode: Removed
+	loading?: boolean // Keep loading prop // Hide built-in mode: Removed
+	// dynamicSearchResults?: SearchResult[] // Hide built-in mode: Removed
 	filteredOptions: ContextMenuQueryItem[] // Add prop for pre-filtered options
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
 	onSelect,
-	// searchQuery, // Removed
+	// searchQuery, // Hide built-in mode: Removed
 	onMouseDown,
 	selectedIndex,
 	setSelectedIndex,
-	// selectedType, // Removed
-	// queryItems, // Removed
-	// modes, // Removed
-	loading = false,
-	// dynamicSearchResults = [], // Removed
+	// selectedType, // Hide built-in mode: Removed
+	// queryItems, // Hide built-in mode: Removed
+	// modes, // Hide built-in mode: Removed
+	// loading = false, // Hide built-in mode: Removed
+	// dynamicSearchResults = [], // Hide built-in mode: Removed
 	filteredOptions, // Use passed-in prop
 }) => {
+	const [materialIconsBaseUri, setMaterialIconsBaseUri] = useState("")
 	const menuRef = useRef<HTMLDivElement>(null)
 
 	// Remove internal calculation, use the prop directly
 	// const filteredOptions = useMemo(() => {
 	// 	return getContextMenuOptions(searchQuery, selectedType, queryItems, dynamicSearchResults, modes)
-	// }, [searchQuery, selectedType, queryItems, dynamicSearchResults, modes])
+	// }, [searchQuery, selectedType, inputValue, queryItems, dynamicSearchResults, modes])
 
 	useEffect(() => {
 		if (menuRef.current) {
@@ -58,6 +60,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 			}
 		}
 	}, [selectedIndex])
+
+	// get the icons base uri on mount
+	useEffect(() => {
+		const w = window as any
+		setMaterialIconsBaseUri(w.MATERIAL_ICONS_BASE_URI)
+	}, [])
 
 	const renderOptionContent = (option: ContextMenuQueryItem) => {
 		switch (option.type) {
@@ -113,21 +121,38 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 			case ContextMenuOptionType.OpenedFile:
 			case ContextMenuOptionType.Folder:
 				if (option.value) {
+					// remove trailing slash
+					const path = removeLeadingNonAlphanumeric(option.value || "").replace(/\/$/, "")
+					const pathList = path.split("/")
+					const filename = pathList.at(-1)
+					const folderPath = pathList.slice(0, -1).join("/")
 					return (
-						<>
-							<span>/</span>
-							{option.value?.startsWith("/.") && <span>.</span>}
+						<div
+							style={{
+								flex: 1,
+								overflow: "hidden",
+								display: "flex",
+								gap: "0.5em",
+								whiteSpace: "nowrap",
+								alignItems: "center",
+								justifyContent: "space-between",
+								textAlign: "left",
+							}}>
+							<span>{filename}</span>
 							<span
 								style={{
 									whiteSpace: "nowrap",
 									overflow: "hidden",
 									textOverflow: "ellipsis",
 									direction: "rtl",
-									textAlign: "left",
+									textAlign: "right",
+									flex: 1,
+									opacity: 0.75,
+									fontSize: "0.75em",
 								}}>
-								{removeLeadingNonAlphanumeric(option.value || "") + "\u200E"}
+								{folderPath}
 							</span>
-						</>
+						</div>
 					)
 				} else {
 					return <span>Add {option.type === ContextMenuOptionType.File ? "File" : "Folder"}</span>
@@ -158,6 +183,15 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 			default:
 				return "file"
 		}
+	}
+
+	const getMaterialIconForOption = (option: ContextMenuQueryItem): string => {
+		// only take the last part of the path to handle both file and folder icons
+		// since material-icons have specific folder icons, we use them if available
+		const name = option.value?.split("/").filter(Boolean).at(-1) ?? ""
+		const iconName =
+			option.type === ContextMenuOptionType.Folder ? getIconForDirectoryPath(name) : getIconForFilePath(name)
+		return getIconUrlByName(iconName, materialIconsBaseUri)
 	}
 
 	const isOptionSelectable = (option: ContextMenuQueryItem): boolean => {
@@ -194,10 +228,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 							key={`${option.type}-${option.value || index}`}
 							onClick={() => isOptionSelectable(option) && onSelect(option.type, option.value)}
 							style={{
-								padding: "8px 12px",
+								padding: "4px 6px",
 								cursor: isOptionSelectable(option) ? "pointer" : "default",
 								color: "var(--vscode-dropdown-foreground)",
-								borderBottom: "1px solid var(--vscode-editorGroup-border)",
 								display: "flex",
 								alignItems: "center",
 								justifyContent: "space-between",
@@ -218,17 +251,35 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 									overflow: "hidden",
 									paddingTop: 0,
 								}}>
-								{option.type !== ContextMenuOptionType.Mode && getIconForOption(option) && (
-									<i
-										className={`codicon codicon-${getIconForOption(option)}`}
+								{(option.type === ContextMenuOptionType.File ||
+									option.type === ContextMenuOptionType.Folder ||
+									option.type === ContextMenuOptionType.OpenedFile) && (
+									<img
+										src={getMaterialIconForOption(option)}
+										alt="Mode"
 										style={{
 											marginRight: "6px",
 											flexShrink: 0,
-											fontSize: "14px",
-											marginTop: 0,
+											width: "16px",
+											height: "16px",
 										}}
 									/>
 								)}
+								{option.type !== ContextMenuOptionType.Mode &&
+									option.type !== ContextMenuOptionType.File &&
+									option.type !== ContextMenuOptionType.Folder &&
+									option.type !== ContextMenuOptionType.OpenedFile &&
+									getIconForOption(option) && (
+										<i
+											className={`codicon codicon-${getIconForOption(option)}`}
+											style={{
+												marginRight: "6px",
+												flexShrink: 0,
+												fontSize: "14px",
+												marginTop: 0,
+											}}
+										/>
+									)}
 								{renderOptionContent(option)}
 							</div>
 							{(option.type === ContextMenuOptionType.File ||
@@ -237,27 +288,15 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 								!option.value && (
 									<i
 										className="codicon codicon-chevron-right"
-										style={{ fontSize: "14px", flexShrink: 0, marginLeft: 8 }}
+										style={{ fontSize: "10px", flexShrink: 0, marginLeft: 8 }}
 									/>
 								)}
-							{(option.type === ContextMenuOptionType.Problems ||
-								option.type === ContextMenuOptionType.Terminal ||
-								((option.type === ContextMenuOptionType.File ||
-									option.type === ContextMenuOptionType.Folder ||
-									option.type === ContextMenuOptionType.OpenedFile ||
-									option.type === ContextMenuOptionType.Git) &&
-									option.value)) && (
-								<i
-									className="codicon codicon-add"
-									style={{ fontSize: "14px", flexShrink: 0, marginLeft: 8 }}
-								/>
-							)}
 						</div>
 					))
 				) : (
 					<div
 						style={{
-							padding: "12px",
+							padding: "4px",
 							display: "flex",
 							alignItems: "center",
 							justifyContent: "center",

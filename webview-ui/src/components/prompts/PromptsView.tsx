@@ -9,7 +9,8 @@ import {
 	VSCodeRadioGroup,
 	VSCodeRadio,
 } from "@vscode/webview-ui-toolkit/react"
-import { useExtensionState } from "../../context/ExtensionStateContext"
+
+import { useExtensionState } from "@src/context/ExtensionStateContext"
 import {
 	Mode,
 	PromptComponent,
@@ -19,15 +20,15 @@ import {
 	modes as builtInModes, // Import built-in modes separately
 	ModeConfig,
 	GroupEntry,
-} from "../../../../src/shared/modes"
-import { modeConfigSchema } from "../../../../src/schemas"
-import { supportPrompt, SupportPromptType } from "../../../../src/shared/support-prompt"
+} from "@roo/shared/modes"
+import { modeConfigSchema } from "@roo/schemas"
+import { supportPrompt, SupportPromptType } from "@roo/shared/support-prompt"
 
-import { TOOL_GROUPS, ToolGroup } from "../../../../src/shared/tool-groups"
-import { vscode } from "../../utils/vscode"
+import { TOOL_GROUPS, ToolGroup } from "@roo/shared/tools"
+import { vscode } from "@src/utils/vscode"
 import { Tab, TabContent, TabHeader } from "../common/Tab"
 import i18next from "i18next"
-import { useAppTranslation } from "../../i18n/TranslationContext"
+import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { Trans } from "react-i18next"
 import { Eye, EyeOff } from "lucide-react" // Import icons
 
@@ -71,6 +72,13 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 		hiddenBuiltInModes, // Get hidden modes state
 		setHiddenBuiltInModes, // Get setter for hidden modes
 	} = useExtensionState()
+
+	// Use a local state to track the visually active mode
+	// This prevents flickering when switching modes rapidly by:
+	// 1. Updating the UI immediately when a mode is clicked
+	// 2. Not syncing with the backend mode state (which would cause flickering)
+	// 3. Still sending the mode change to the backend for persistence
+	const [visualMode, setVisualMode] = useState(mode)
 
 	// Memoize modes to preserve array order
 	// Combine built-in and custom modes
@@ -152,22 +160,25 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 	// Handle mode switching with explicit state initialization
 	const handleModeSwitch = useCallback(
 		(modeConfig: ModeConfig) => {
-			if (modeConfig.slug === mode) return // Prevent unnecessary updates
+			if (modeConfig.slug === visualMode) return // Prevent unnecessary updates
 
-			// First switch the mode
+			// Immediately update visual state for instant feedback
+			setVisualMode(modeConfig.slug)
+
+			// Then send the mode change message to the backend
 			switchMode(modeConfig.slug)
 
 			// Exit tools edit mode when switching modes
 			setIsToolsEditMode(false)
 		},
-		[mode, switchMode, setIsToolsEditMode],
+		[visualMode, switchMode, setIsToolsEditMode],
 	)
 
 	// Helper function to get current mode's config
 	const getCurrentMode = useCallback((): ModeConfig | undefined => {
 		const findMode = (m: ModeConfig): boolean => m.slug === mode
 		return customModes?.find(findMode) || allModes.find(findMode) // Use allModes here for internal logic
-	}, [mode, customModes, allModes]) // Fix dependency array
+	}, [mode, customModes, allModes])
 
 	// Helper function to safely access mode properties
 	const getModeProperty = <T extends keyof ModeConfig>(
@@ -342,7 +353,7 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 
 	// Handle clicks outside the config menu
 	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
+		const handleClickOutside = () => {
 			if (showConfigMenu) {
 				setShowConfigMenu(false)
 			}
@@ -540,20 +551,20 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 
 				<div style={{ marginBottom: "20px" }}>
 					{/* Only show name and delete for custom modes */}
-					{mode && findModeBySlug(mode, customModes) && (
+					{visualMode && findModeBySlug(visualMode, customModes) && (
 						<div className="flex gap-3 mb-4">
 							<div className="flex-1">
 								<div className="font-bold mb-1">{t("prompts:createModeDialog.name.label")}</div>
 								<div className="flex gap-2">
 									<VSCodeTextField
-										value={getModeProperty(findModeBySlug(mode, customModes), "name") ?? ""}
+										value={getModeProperty(findModeBySlug(visualMode, customModes), "name") ?? ""}
 										onChange={(e: Event | React.FormEvent<HTMLElement>) => {
 											const target =
 												(e as CustomEvent)?.detail?.target ||
 												((e as any).target as HTMLInputElement)
-											const customMode = findModeBySlug(mode, customModes)
+											const customMode = findModeBySlug(visualMode, customModes)
 											if (customMode) {
-												updateCustomMode(mode, {
+												updateCustomMode(visualMode, {
 													...customMode,
 													name: target.value,
 													source: customMode.source || "global",
@@ -569,7 +580,7 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 										onClick={() => {
 											vscode.postMessage({
 												type: "deleteCustomMode",
-												slug: mode,
+												slug: visualMode,
 											})
 										}}>
 										<span className="codicon codicon-trash"></span>
@@ -581,7 +592,7 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 					<div style={{ marginBottom: "16px" }}>
 						<div className="flex justify-between items-center mb-1">
 							<div className="font-bold">{t("prompts:roleDefinition.title")}</div>
-							{!findModeBySlug(mode, customModes) && (
+							{!findModeBySlug(visualMode, customModes) && (
 								<Button
 									variant="ghost"
 									size="icon"
@@ -602,25 +613,29 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 						</div>
 						<VSCodeTextArea
 							value={(() => {
-								const customMode = findModeBySlug(mode, customModes)
-								const prompt = customModePrompts?.[mode] as PromptComponent
-								return customMode?.roleDefinition ?? prompt?.roleDefinition ?? getRoleDefinition(mode)
+								const customMode = findModeBySlug(visualMode, customModes)
+								const prompt = customModePrompts?.[visualMode] as PromptComponent
+								return (
+									customMode?.roleDefinition ??
+									prompt?.roleDefinition ??
+									getRoleDefinition(visualMode)
+								)
 							})()}
 							onChange={(e) => {
 								const value =
 									(e as CustomEvent)?.detail?.target?.value ||
 									((e as any).target as HTMLTextAreaElement).value
-								const customMode = findModeBySlug(mode, customModes)
+								const customMode = findModeBySlug(visualMode, customModes)
 								if (customMode) {
 									// For custom modes, update the JSON file
-									updateCustomMode(mode, {
+									updateCustomMode(visualMode, {
 										...customMode,
 										roleDefinition: value.trim() || "",
 										source: customMode.source || "global",
 									})
 								} else {
 									// For built-in modes, update the prompts
-									updateAgentPrompt(mode, {
+									updateAgentPrompt(visualMode, {
 										roleDefinition: value.trim() || undefined,
 									})
 								}
@@ -664,7 +679,7 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 						<div className="mb-4">
 							<div className="flex justify-between items-center mb-1">
 								<div className="font-bold">{t("prompts:tools.title")}</div>
-								{findModeBySlug(mode, customModes) && (
+								{findModeBySlug(visualMode, customModes) && (
 									<Button
 										variant="ghost"
 										size="icon"
@@ -679,16 +694,16 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 									</Button>
 								)}
 							</div>
-							{!findModeBySlug(mode, customModes) && (
+							{!findModeBySlug(visualMode, customModes) && (
 								<div className="text-sm text-vscode-descriptionForeground mb-2">
 									{t("prompts:tools.builtInModesText")}
 								</div>
 							)}
-							{isToolsEditMode && findModeBySlug(mode, customModes) ? (
+							{isToolsEditMode && findModeBySlug(visualMode, customModes) ? (
 								<div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
 									{availableGroups.map((group) => {
 										const currentMode = getCurrentMode()
-										const isCustomMode = findModeBySlug(mode, customModes)
+										const isCustomMode = findModeBySlug(visualMode, customModes)
 										const customMode = isCustomMode
 										const isGroupEnabled = isCustomMode
 											? customMode?.groups?.some((g) => getGroupName(g) === group)
@@ -757,7 +772,7 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 								marginBottom: "4px",
 							}}>
 							<div style={{ fontWeight: "bold" }}>{t("prompts:customInstructions.title")}</div>
-							{!findModeBySlug(mode, customModes) && (
+							{!findModeBySlug(visualMode, customModes) && (
 								<Button
 									variant="ghost"
 									size="icon"
@@ -785,8 +800,8 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 						</div>
 						<VSCodeTextArea
 							value={(() => {
-								const customMode = findModeBySlug(mode, customModes)
-								const prompt = customModePrompts?.[mode] as PromptComponent
+								const customMode = findModeBySlug(visualMode, customModes)
+								const prompt = customModePrompts?.[visualMode] as PromptComponent
 								return (
 									customMode?.customInstructions ??
 									prompt?.customInstructions ??
@@ -797,18 +812,18 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 								const value =
 									(e as CustomEvent)?.detail?.target?.value ||
 									((e as any).target as HTMLTextAreaElement).value
-								const customMode = findModeBySlug(mode, customModes)
+								const customMode = findModeBySlug(visualMode, customModes)
 								if (customMode) {
 									// For custom modes, update the JSON file
-									updateCustomMode(mode, {
+									updateCustomMode(visualMode, {
 										...customMode,
 										customInstructions: value.trim() || undefined,
 										source: customMode.source || "global",
 									})
 								} else {
 									// For built-in modes, update the prompts
-									const existingPrompt = customModePrompts?.[mode] as PromptComponent
-									updateAgentPrompt(mode, {
+									const existingPrompt = customModePrompts?.[visualMode] as PromptComponent
+									updateAgentPrompt(visualMode, {
 										...existingPrompt,
 										customInstructions: value.trim(),
 									})
