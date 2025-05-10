@@ -1259,6 +1259,7 @@ export class ClineProvider extends EventEmitter<ClineProviderEvents> implements 
 			showRooIgnoredFiles,
 			language,
 			maxReadFileLine,
+			hiddenBuiltInModes,
 			terminalCompressProgressBar,
 			historyPreviewCollapsed,
 		} = await this.getState()
@@ -1345,6 +1346,7 @@ export class ClineProvider extends EventEmitter<ClineProviderEvents> implements 
 			renderContext: this.renderContext,
 			maxReadFileLine: maxReadFileLine ?? 500,
 			settingsImportedAt: this.settingsImportedAt,
+			hiddenBuiltInModes: hiddenBuiltInModes ?? [],
 			terminalCompressProgressBar: terminalCompressProgressBar ?? true,
 			hasSystemPromptOverride,
 			historyPreviewCollapsed: historyPreviewCollapsed ?? false,
@@ -1437,6 +1439,7 @@ export class ClineProvider extends EventEmitter<ClineProviderEvents> implements 
 			telemetrySetting: stateValues.telemetrySetting || "unset",
 			showRooIgnoredFiles: stateValues.showRooIgnoredFiles ?? true,
 			maxReadFileLine: stateValues.maxReadFileLine ?? 500,
+			hiddenBuiltInModes: stateValues.hiddenBuiltInModes ?? [], // Add hiddenBuiltInModes here
 			historyPreviewCollapsed: stateValues.historyPreviewCollapsed ?? false,
 		}
 	}

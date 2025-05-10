@@ -168,6 +168,7 @@ type GlobalSettings = {
 		  }
 		| undefined
 	enhancementApiConfigId?: string | undefined
+	hiddenBuiltInModes?: string[] | undefined
 	historyPreviewCollapsed?: boolean | undefined
 }
 
