@@ -130,6 +130,7 @@ export interface WebviewMessage {
 		| "maxReadFileLine"
 		| "searchFiles"
 		| "toggleApiConfigPin"
+		| "updateHiddenBuiltInModes"
 		| "setHistoryPreviewCollapsed"
 	text?: string
 	disabled?: boolean
@@ -157,6 +158,7 @@ export interface WebviewMessage {
 	source?: "global" | "project"
 	requestId?: string
 	ids?: string[]
+	hiddenModes?: string[]
 	hasSystemPromptOverride?: boolean
 	terminalOperation?: "continue" | "abort"
 	historyPreviewCollapsed?: boolean

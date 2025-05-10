@@ -8,6 +8,8 @@
 		"editGlobalModes": "グローバルモードを編集",
 		"editProjectModes": "プロジェクトモードを編集 (.roomodes)",
 		"createModeHelpText": "+ をクリックして新しいカスタムモードを作成するか、チャットで Roo に作成を依頼してください！",
+		"hideBuiltInModes": "組み込みモードを非表示",
+		"showBuiltInModes": "組み込みモードを表示",
 		"selectMode": "モードを検索"
 	},
 	"apiConfiguration": {

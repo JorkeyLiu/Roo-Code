@@ -1,46 +1,49 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"
-import { getIconForFilePath, getIconUrlByName, getIconForDirectoryPath } from "vscode-material-icons"
+import React, { useEffect, useRef, useState } from "react" // Hide built-in mode: Remove useMemo
 import {
 	ContextMenuOptionType,
 	ContextMenuQueryItem,
-	getContextMenuOptions,
-	SearchResult,
+	// getContextMenuOptions, // Hide built-in mode: Remove unused import
+	// SearchResult, // Hide built-in mode: Remove unused import
 } from "@src/utils/context-mentions"
 import { removeLeadingNonAlphanumeric } from "../common/CodeAccordian"
-import { ModeConfig } from "@roo/shared/modes"
+// import { ModeConfig } from "@roo/shared/modes" // Hide built-in mode: Remove unused import
+import { getIconForFilePath, getIconUrlByName, getIconForDirectoryPath } from "vscode-material-icons"
 
 interface ContextMenuProps {
 	onSelect: (type: ContextMenuOptionType, value?: string) => void
-	searchQuery: string
-	inputValue: string
+	// Hide built-in mode: Remove props related to calculation, as options are now passed in
+	// Hide built-in mode: Remove searchQuery: string
 	onMouseDown: () => void
 	selectedIndex: number
 	setSelectedIndex: (index: number) => void
-	selectedType: ContextMenuOptionType | null
-	queryItems: ContextMenuQueryItem[]
-	modes?: ModeConfig[]
-	loading?: boolean
-	dynamicSearchResults?: SearchResult[]
+	// selectedType: ContextMenuOptionType | null // Hide built-in mode: Removed
+	// queryItems: ContextMenuQueryItem[] // Hide built-in mode: Removed
+	// modes?: ModeConfig[] // Hide built-in mode: Removed
+	loading?: boolean // Keep loading prop // Hide built-in mode: Removed
+	// dynamicSearchResults?: SearchResult[] // Hide built-in mode: Removed
+	filteredOptions: ContextMenuQueryItem[] // Add prop for pre-filtered options
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
 	onSelect,
-	searchQuery,
-	inputValue,
+	// searchQuery, // Hide built-in mode: Removed
 	onMouseDown,
 	selectedIndex,
 	setSelectedIndex,
-	selectedType,
-	queryItems,
-	modes,
-	dynamicSearchResults = [],
+	// selectedType, // Hide built-in mode: Removed
+	// queryItems, // Hide built-in mode: Removed
+	// modes, // Hide built-in mode: Removed
+	// loading = false, // Hide built-in mode: Removed
+	// dynamicSearchResults = [], // Hide built-in mode: Removed
+	filteredOptions, // Use passed-in prop
 }) => {
 	const [materialIconsBaseUri, setMaterialIconsBaseUri] = useState("")
 	const menuRef = useRef<HTMLDivElement>(null)
 
-	const filteredOptions = useMemo(() => {
-		return getContextMenuOptions(searchQuery, inputValue, selectedType, queryItems, dynamicSearchResults, modes)
-	}, [searchQuery, inputValue, selectedType, queryItems, dynamicSearchResults, modes])
+	// Remove internal calculation, use the prop directly
+	// const filteredOptions = useMemo(() => {
+	// 	return getContextMenuOptions(searchQuery, selectedType, queryItems, dynamicSearchResults, modes)
+	// }, [searchQuery, selectedType, inputValue, queryItems, dynamicSearchResults, modes])
 
 	useEffect(() => {
 		if (menuRef.current) {
@@ -218,7 +221,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 					maxHeight: "200px",
 					overflowY: "auto",
 				}}>
-				{filteredOptions && filteredOptions.length > 0 ? (
+				{/* Render directly using the filteredOptions prop */}
+				{filteredOptions.length > 0 ? (
 					filteredOptions.map((option, index) => (
 						<div
 							key={`${option.type}-${option.value || index}`}

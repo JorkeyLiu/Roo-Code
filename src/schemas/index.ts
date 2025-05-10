@@ -725,6 +725,7 @@ export const globalSettingsSchema = z.object({
 	customModePrompts: customModePromptsSchema.optional(),
 	customSupportPrompts: customSupportPromptsSchema.optional(),
 	enhancementApiConfigId: z.string().optional(),
+	hiddenBuiltInModes: z.array(z.string()).optional(), // List of built-in mode slugs to hide
 	historyPreviewCollapsed: z.boolean().optional(),
 })
 
@@ -804,6 +805,7 @@ const globalSettingsRecord: GlobalSettingsRecord = {
 	customSupportPrompts: undefined,
 	enhancementApiConfigId: undefined,
 	cachedChromeHostUrl: undefined,
+	hiddenBuiltInModes: undefined,
 	historyPreviewCollapsed: undefined,
 }
 
