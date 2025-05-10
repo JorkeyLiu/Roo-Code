@@ -1646,4 +1646,46 @@ export class Task extends EventEmitter<ClineEvents> {
 	public getFileContextTracker(): FileContextTracker {
 		return this.fileContextTracker
 	}
+
+	private async getInitializedCheckpointService({
+		interval = 250,
+		timeout = 15_000,
+	}: { interval?: number; timeout?: number } = {}) {
+		const service = getCheckpointService(this)
+
+		if (!service || service.isInitialized) {
+			return service
+		}
+
+		try {
+			await pWaitFor(
+				() => {
+					return service.isInitialized
+				},
+				{ interval, timeout },
+			)
+
+			return service
+		} catch (err) {
+			return undefined
+		}
+	}
+
+	/** Public getter for the checkpoint service instance. */
+	public getCheckpointServiceInstance(): RepoPerTaskCheckpointService | undefined {
+		return this.checkpointService
+	}
+
+	/**
+	 * Gets the initialized checkpoint service instance if available, logging relevant state for resend context.
+	 * Returns undefined if the service is not available or not initialized.
+	 * @returns The initialized RepoPerTaskCheckpointService instance or undefined.
+	 */
+	public async getAvailableCheckpointServiceForResend(): Promise<RepoPerTaskCheckpointService | undefined> {
+		const service = await this.getInitializedCheckpointService()
+		const serviceAvailable = !!(service && service.isInitialized)
+		// Logs removed as per user request
+
+		return serviceAvailable ? service : undefined
+	}
 }
