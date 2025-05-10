@@ -9,7 +9,8 @@
 		"editProjectModes": "Edytuj tryby projektu (.roomodes)",
 		"createModeHelpText": "Kliknij +, aby utworzyć nowy niestandardowy tryb, lub po prostu poproś Roo w czacie, aby utworzył go dla Ciebie!",
 		"hideBuiltInModes": "Ukryj wbudowane tryby",
-		"showBuiltInModes": "Pokaż wbudowane tryby"
+		"showBuiltInModes": "Pokaż wbudowane tryby",
+		"selectMode": "Szukaj trybów"
 	},
 	"apiConfiguration": {
 		"title": "Konfiguracja API",
@@ -27,7 +28,8 @@
 			"browser": "Używaj przeglądarki",
 			"command": "Uruchamiaj polecenia",
 			"mcp": "Używaj MCP"
-		}
+		},
+		"noTools": "Brak"
 	},
 	"roleDefinition": {
 		"title": "Definicja roli",

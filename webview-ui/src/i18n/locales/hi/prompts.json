@@ -9,7 +9,8 @@
 		"editProjectModes": "प्रोजेक्ट मोड्स संपादित करें (.roomodes)",
 		"createModeHelpText": "नया कस्टम मोड बनाने के लिए + पर क्लिक करें, या बस चैट में Roo से आपके लिए एक बनाने को कहें!",
 		"hideBuiltInModes": "बिल्ट-इन मोड छिपाएँ",
-		"showBuiltInModes": "बिल्ट-इन मोड दिखाएँ"
+		"showBuiltInModes": "बिल्ट-इन मोड दिखाएँ",
+		"selectMode": "मोड खोजें"
 	},
 	"apiConfiguration": {
 		"title": "API कॉन्फ़िगरेशन",
@@ -27,7 +28,8 @@
 			"browser": "ब्राउज़र का उपयोग करें",
 			"command": "कमांड्स चलाएँ",
 			"mcp": "MCP का उपयोग करें"
-		}
+		},
+		"noTools": "कोई नहीं"
 	},
 	"roleDefinition": {
 		"title": "भूमिका परिभाषा",

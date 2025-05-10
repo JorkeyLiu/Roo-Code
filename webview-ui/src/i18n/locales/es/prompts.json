@@ -9,7 +9,8 @@
 		"editProjectModes": "Editar modos del proyecto (.roomodes)",
 		"createModeHelpText": "¡Haz clic en + para crear un nuevo modo personalizado, o simplemente pídele a Roo en el chat que te cree uno!",
 		"hideBuiltInModes": "Ocultar modos integrados",
-		"showBuiltInModes": "Mostrar modos integrados"
+		"showBuiltInModes": "Mostrar modos integrados",
+		"selectMode": "Buscar modos"
 	},
 	"apiConfiguration": {
 		"title": "Configuración de API",
@@ -27,7 +28,8 @@
 			"browser": "Usar navegador",
 			"command": "Ejecutar comandos",
 			"mcp": "Usar MCP"
-		}
+		},
+		"noTools": "Ninguna"
 	},
 	"roleDefinition": {
 		"title": "Definición de rol",
