@@ -155,24 +155,20 @@ export const ChatRowContent = ({
 	const handleEditKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault() // Prevent newline
-			// Check if content actually changed to prevent unnecessary messages
-			const originalText = message.text || ""
-			if (editedContent.trim() !== originalText.trim()) {
-				// Send check confirmation message
-				vscode.postMessage({
-					type: "resendMessage",
-					payload: {
-						originalMessageId: message.ts.toString(), // Convert timestamp number to string
-						editedText: editedContent, // Match backend schema key 'editedText'
-					},
-				})
-				// Call the reset function after posting the message
-				if (onChatReset) {
-					onChatReset()
-				} else {
-					console.error("onChatReset prop is missing in ChatRow")
-				}
-			} // <-- Add missing closing brace for the outer if statement
+			// Send check confirmation message
+			vscode.postMessage({
+				type: "resendMessage",
+				payload: {
+					originalMessageId: message.ts.toString(), // Convert timestamp number to string
+					editedText: editedContent, // Match backend schema key 'editedText'
+				},
+			})
+			// Call the reset function after posting the message
+			if (onChatReset) {
+				onChatReset()
+			} else {
+				console.error("onChatReset prop is missing in ChatRow")
+			}
 			setIsEditing(false) // Ensure setIsEditing is called after handling Enter
 		} else if (event.key === "Escape") {
 			setIsEditing(false)

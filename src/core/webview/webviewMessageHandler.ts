@@ -37,7 +37,6 @@ import { openMention } from "../mentions"
 import { telemetryService } from "../../services/telemetry/TelemetryService"
 import { TelemetrySetting } from "../../shared/TelemetrySetting"
 import { getWorkspacePath } from "../../utils/path"
-// Cline import moved near ClineProvider
 import { Mode, defaultModeSlug } from "../../shared/modes"
 import { GlobalState, ClineMessage as ClineMessageType } from "../../schemas"
 import { getModels, flushModels } from "../../api/providers/fetchers/cache"
