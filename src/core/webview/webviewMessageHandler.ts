@@ -4,11 +4,10 @@ import pWaitFor from "p-wait-for"
 import * as vscode from "vscode"
 
 import { ClineProvider } from "./ClineProvider"
-import { Cline } from "../Cline"
 import delay from "delay"
-import { Language, ApiConfigMeta } from "../../schemas"
+import { Language, ProviderSettings } from "../../schemas"
 import { changeLanguage, t } from "../../i18n"
-import { ApiConfiguration } from "../../shared/api"
+import { RouterName, toRouterName } from "../../shared/api"
 import { supportPrompt } from "../../shared/support-prompt"
 import {
 	checkoutDiffPayloadSchema,
@@ -38,19 +37,20 @@ import { openMention } from "../mentions"
 import { telemetryService } from "../../services/telemetry/TelemetryService"
 import { TelemetrySetting } from "../../shared/TelemetrySetting"
 import { getWorkspacePath } from "../../utils/path"
-import { Mode, defaultModeSlug, getModeBySlug, getGroupName } from "../../shared/modes"
-import { SYSTEM_PROMPT } from "../prompts/system"
-import { buildApiHandler } from "../../api"
-import { MultiSearchReplaceDiffStrategy } from "../diff/strategies/multi-search-replace"
-import { getModels } from "../../api/providers/fetchers/cache"
-import { GlobalState, ClineMessage as ClineMessageType } from "../../schemas" // Import ClineMessageType if needed for clarity
 // Cline import moved near ClineProvider
+import { Mode, defaultModeSlug } from "../../shared/modes"
+import { GlobalState, ClineMessage as ClineMessageType } from "../../schemas"
+import { getModels, flushModels } from "../../api/providers/fetchers/cache"
+import { generateSystemPrompt } from "./generateSystemPrompt"
+import { Task } from "../task/Task"
+
+const ALLOWED_VSCODE_SETTINGS = new Set(["terminal.integrated.inheritEnv"])
 
 // Helper function to handle the "Resend Only" logic (delete messages and send new one)
 // Renamed function to reflect its sole purpose: deleting messages for resend operation
 async function _deleteMessagesForResend(
 	provider: ClineProvider,
-	cline: Cline,
+	cline: Task,
 	originalMessageIndex: number,
 	originalMessageTs: number, // Timestamp to find the message and its API history entry
 ) {
@@ -175,19 +175,12 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 
 					if (currentConfigName) {
 						if (!(await provider.providerSettingsManager.hasConfig(currentConfigName))) {
-							// current config name not valid, get first config in list
-							await updateGlobalState("currentApiConfigName", listApiConfig?.[0]?.name)
-							if (listApiConfig?.[0]?.name) {
-								const apiConfig = await provider.providerSettingsManager.loadConfig(
-									listApiConfig?.[0]?.name,
-								)
+							// Current config name not valid, get first config in list.
+							const name = listApiConfig[0]?.name
+							await updateGlobalState("currentApiConfigName", name)
 
-								await Promise.all([
-									updateGlobalState("listApiConfigMeta", listApiConfig),
-									provider.postMessageToWebview({ type: "listApiConfig", listApiConfig }),
-									provider.updateApiConfiguration(apiConfig),
-								])
-								await provider.postStateToWebview()
+							if (name) {
+								await provider.activateProviderProfile({ name })
 								return
 							}
 						}
@@ -214,21 +207,10 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			provider.isViewLaunched = true
 			break
 		case "newTask":
-			// Code that should run in response to the hello message command
-			//vscode.window.showInformationMessage(message.text!)
-
-			// Send a message to our webview.
-			// You can send any JSON serializable data.
-			// Could also do this in extension .ts
-			//provider.postMessageToWebview({ type: "text", text: `Extension: ${Date.now()}` })
-			// initializing new instance of Cline will make sure that any agentically running promises in old instance don't affect our new task. this essentially creates a fresh slate for the new task
+			// Initializing new instance of Cline will make sure that any
+			// agentically running promises in old instance don't affect our new
+			// task. This essentially creates a fresh slate for the new task.
 			await provider.initClineWithTask(message.text, message.images)
-			break
-		case "apiConfiguration":
-			if (message.apiConfiguration) {
-				await provider.updateApiConfiguration(message.apiConfiguration)
-			}
-			await provider.postStateToWebview()
 			break
 		case "customInstructions":
 			await provider.updateCustomInstructions(message.text)
@@ -373,12 +355,19 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 		case "resetState":
 			await provider.resetState()
 			break
+		case "flushRouterModels":
+			const routerName: RouterName = toRouterName(message.text)
+			await flushModels(routerName)
+			break
 		case "requestRouterModels":
-			const [openRouterModels, requestyModels, glamaModels, unboundModels] = await Promise.all([
-				getModels("openrouter"),
-				getModels("requesty"),
-				getModels("glama"),
-				getModels("unbound"),
+			const { apiConfiguration } = await provider.getState()
+
+			const [openRouterModels, requestyModels, glamaModels, unboundModels, litellmModels] = await Promise.all([
+				getModels("openrouter", apiConfiguration.openRouterApiKey),
+				getModels("requesty", apiConfiguration.requestyApiKey),
+				getModels("glama", apiConfiguration.glamaApiKey),
+				getModels("unbound", apiConfiguration.unboundApiKey),
+				getModels("litellm", apiConfiguration.litellmApiKey, apiConfiguration.litellmBaseUrl),
 			])
 
 			provider.postMessageToWebview({
@@ -388,6 +377,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 					requesty: requestyModels,
 					glama: glamaModels,
 					unbound: unboundModels,
+					litellm: litellmModels,
 				},
 			})
 			break
@@ -396,7 +386,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 				const openAiModels = await getOpenAiModels(
 					message?.values?.baseUrl,
 					message?.values?.apiKey,
-					message?.values?.hostHeader,
+					message?.values?.openAiHeaders,
 				)
 
 				provider.postMessageToWebview({ type: "openAiModels", openAiModels })
@@ -422,7 +412,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			openImage(message.text!)
 			break
 		case "openFile":
-			openFile(message.text!, message.values as { create?: boolean; content?: string })
+			openFile(message.text!, message.values as { create?: boolean; content?: string; line?: number })
 			break
 		case "openMention":
 			openMention(message.text)
@@ -461,16 +451,29 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			break
 		case "allowedCommands":
 			await provider.context.globalState.update("allowedCommands", message.commands)
-			// Also update workspace settings
+
+			// Also update workspace settings.
 			await vscode.workspace
 				.getConfiguration("roo-cline")
 				.update("allowedCommands", message.commands, vscode.ConfigurationTarget.Global)
+
 			break
+		case "openCustomModesSettings": {
+			const customModesFilePath = await provider.customModesManager.getCustomModesFilePath()
+
+			if (customModesFilePath) {
+				openFile(customModesFilePath)
+			}
+
+			break
+		}
 		case "openMcpSettings": {
 			const mcpSettingsFilePath = await provider.getMcpHub()?.getMcpSettingsFilePath()
+
 			if (mcpSettingsFilePath) {
 				openFile(mcpSettingsFilePath)
 			}
+
 			break
 		}
 		case "openProjectMcpSettings": {
@@ -486,20 +489,16 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			try {
 				await fs.mkdir(rooDir, { recursive: true })
 				const exists = await fileExistsAtPath(mcpPath)
+
 				if (!exists) {
 					await fs.writeFile(mcpPath, JSON.stringify({ mcpServers: {} }, null, 2))
 				}
+
 				await openFile(mcpPath)
 			} catch (error) {
 				vscode.window.showErrorMessage(t("common:errors.create_mcp_json", { error: `${error}` }))
 			}
-			break
-		}
-		case "openCustomModesSettings": {
-			const customModesFilePath = await provider.customModesManager.getCustomModesFilePath()
-			if (customModesFilePath) {
-				openFile(customModesFilePath)
-			}
+
 			break
 		}
 		case "deleteMcpServer": {
@@ -645,6 +644,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			if (!message.text) {
 				// Use testBrowserConnection for auto-discovery
 				const chromeHostUrl = await discoverChromeHostUrl()
+
 				if (chromeHostUrl) {
 					// Send the result back to the webview
 					await provider.postMessageToWebview({
@@ -664,6 +664,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 				// Test the provided URL
 				const customHostUrl = message.text
 				const hostIsValid = await tryChromeHostUrl(message.text)
+
 				// Send the result back to the webview
 				await provider.postMessageToWebview({
 					type: "browserConnectionResult",
@@ -677,6 +678,42 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 		case "fuzzyMatchThreshold":
 			await updateGlobalState("fuzzyMatchThreshold", message.value)
 			await provider.postStateToWebview()
+			break
+		case "updateVSCodeSetting": {
+			const { setting, value } = message
+
+			if (setting !== undefined && value !== undefined) {
+				if (ALLOWED_VSCODE_SETTINGS.has(setting)) {
+					await vscode.workspace.getConfiguration().update(setting, value, true)
+				} else {
+					vscode.window.showErrorMessage(`Cannot update restricted VSCode setting: ${setting}`)
+				}
+			}
+
+			break
+		}
+		case "getVSCodeSetting":
+			const { setting } = message
+
+			if (setting) {
+				try {
+					await provider.postMessageToWebview({
+						type: "vsCodeSetting",
+						setting,
+						value: vscode.workspace.getConfiguration().get(setting),
+					})
+				} catch (error) {
+					console.error(`Failed to get VSCode setting ${message.setting}:`, error)
+
+					await provider.postMessageToWebview({
+						type: "vsCodeSetting",
+						setting,
+						error: `Failed to get setting: ${error.message}`,
+						value: undefined,
+					})
+				}
+			}
+
 			break
 		case "alwaysApproveResubmit":
 			await updateGlobalState("alwaysApproveResubmit", message.bool ?? false)
@@ -1149,45 +1186,36 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 					const { apiConfiguration, customSupportPrompts, listApiConfigMeta, enhancementApiConfigId } =
 						await provider.getState()
 
-					// Try to get enhancement config first, fall back to current config
-					let configToUse: ApiConfiguration = apiConfiguration
-					if (enhancementApiConfigId) {
-						const config = listApiConfigMeta?.find((c: ApiConfigMeta) => c.id === enhancementApiConfigId)
-						if (config?.name) {
-							const loadedConfig = await provider.providerSettingsManager.loadConfig(config.name)
-							if (loadedConfig.apiProvider) {
-								configToUse = loadedConfig
-							}
+					// Try to get enhancement config first, fall back to current config.
+					let configToUse: ProviderSettings = apiConfiguration
+
+					if (enhancementApiConfigId && !!listApiConfigMeta.find(({ id }) => id === enhancementApiConfigId)) {
+						const { name: _, ...providerSettings } = await provider.providerSettingsManager.getProfile({
+							id: enhancementApiConfigId,
+						})
+
+						if (providerSettings.apiProvider) {
+							configToUse = providerSettings
 						}
 					}
 
 					const enhancedPrompt = await singleCompletionHandler(
 						configToUse,
-						supportPrompt.create(
-							"ENHANCE",
-							{
-								userInput: message.text,
-							},
-							customSupportPrompts,
-						),
+						supportPrompt.create("ENHANCE", { userInput: message.text }, customSupportPrompts),
 					)
 
-					// Capture telemetry for prompt enhancement
+					// Capture telemetry for prompt enhancement.
 					const currentCline = provider.getCurrentCline()
 					telemetryService.capturePromptEnhanced(currentCline?.taskId)
 
-					await provider.postMessageToWebview({
-						type: "enhancedPrompt",
-						text: enhancedPrompt,
-					})
+					await provider.postMessageToWebview({ type: "enhancedPrompt", text: enhancedPrompt })
 				} catch (error) {
 					provider.log(
 						`Error enhancing prompt: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
 					)
+
 					vscode.window.showErrorMessage(t("common:errors.enhance_prompt"))
-					await provider.postMessageToWebview({
-						type: "enhancedPrompt",
-					})
+					await provider.postMessageToWebview({ type: "enhancedPrompt" })
 				}
 			}
 			break
@@ -1294,7 +1322,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			break
 		case "upsertApiConfiguration":
 			if (message.text && message.apiConfiguration) {
-				await provider.upsertApiConfiguration(message.text, message.apiConfiguration)
+				await provider.upsertProviderProfile(message.text, message.apiConfiguration)
 			}
 			break
 		case "renameApiConfiguration":
@@ -1306,30 +1334,23 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 						break
 					}
 
-					// Load the old configuration to get its ID
-					const oldConfig = await provider.providerSettingsManager.loadConfig(oldName)
+					// Load the old configuration to get its ID.
+					const { id } = await provider.providerSettingsManager.getProfile({ name: oldName })
 
-					// Create a new configuration with the same ID
-					const newConfig = {
-						...message.apiConfiguration,
-						id: oldConfig.id, // Preserve the ID
-					}
+					// Create a new configuration with the new name and old ID.
+					await provider.providerSettingsManager.saveConfig(newName, { ...message.apiConfiguration, id })
 
-					// Save with the new name but same ID
-					await provider.providerSettingsManager.saveConfig(newName, newConfig)
+					// Delete the old configuration.
 					await provider.providerSettingsManager.deleteConfig(oldName)
 
-					const listApiConfig = await provider.providerSettingsManager.listConfig()
-
-					// Update listApiConfigMeta first to ensure UI has latest data
-					await updateGlobalState("listApiConfigMeta", listApiConfig)
-					await updateGlobalState("currentApiConfigName", newName)
-
-					await provider.postStateToWebview()
+					// Re-activate to update the global settings related to the
+					// currently activated provider profile.
+					await provider.activateProviderProfile({ name: newName })
 				} catch (error) {
 					provider.log(
 						`Error rename api configuration: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
 					)
+
 					vscode.window.showErrorMessage(t("common:errors.rename_api_config"))
 				}
 			}
@@ -1337,16 +1358,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 		case "loadApiConfiguration":
 			if (message.text) {
 				try {
-					const apiConfig = await provider.providerSettingsManager.loadConfig(message.text)
-					const listApiConfig = await provider.providerSettingsManager.listConfig()
-
-					await Promise.all([
-						updateGlobalState("listApiConfigMeta", listApiConfig),
-						updateGlobalState("currentApiConfigName", message.text),
-						provider.updateApiConfiguration(apiConfig),
-					])
-
-					await provider.postStateToWebview()
+					await provider.activateProviderProfile({ name: message.text })
 				} catch (error) {
 					provider.log(
 						`Error load api configuration: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
@@ -1358,18 +1370,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 		case "loadApiConfigurationById":
 			if (message.text) {
 				try {
-					const { config: apiConfig, name } = await provider.providerSettingsManager.loadConfigById(
-						message.text,
-					)
-					const listApiConfig = await provider.providerSettingsManager.listConfig()
-
-					await Promise.all([
-						updateGlobalState("listApiConfigMeta", listApiConfig),
-						updateGlobalState("currentApiConfigName", name),
-						provider.updateApiConfiguration(apiConfig),
-					])
-
-					await provider.postStateToWebview()
+					await provider.activateProviderProfile({ id: message.text })
 				} catch (error) {
 					provider.log(
 						`Error load api configuration by ID: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
@@ -1390,29 +1391,25 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 					break
 				}
 
+				const oldName = message.text
+
+				const newName = (await provider.providerSettingsManager.listConfig()).filter(
+					(c) => c.name !== oldName,
+				)[0]?.name
+
+				if (!newName) {
+					vscode.window.showErrorMessage(t("common:errors.delete_api_config"))
+					return
+				}
+
 				try {
-					await provider.providerSettingsManager.deleteConfig(message.text)
-					const listApiConfig = await provider.providerSettingsManager.listConfig()
-
-					// Update listApiConfigMeta first to ensure UI has latest data
-					await updateGlobalState("listApiConfigMeta", listApiConfig)
-
-					// If this was the current config, switch to first available
-					const currentApiConfigName = getGlobalState("currentApiConfigName")
-
-					if (message.text === currentApiConfigName && listApiConfig?.[0]?.name) {
-						const apiConfig = await provider.providerSettingsManager.loadConfig(listApiConfig[0].name)
-						await Promise.all([
-							updateGlobalState("currentApiConfigName", listApiConfig[0].name),
-							provider.updateApiConfiguration(apiConfig),
-						])
-					}
-
-					await provider.postStateToWebview()
+					await provider.providerSettingsManager.deleteConfig(oldName)
+					await provider.activateProviderProfile({ name: newName })
 				} catch (error) {
 					provider.log(
 						`Error delete api configuration: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
 					)
+
 					vscode.window.showErrorMessage(t("common:errors.delete_api_config"))
 				}
 			}
@@ -1518,69 +1515,4 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			break
 		}
 	}
-}
-
-const generateSystemPrompt = async (provider: ClineProvider, message: WebviewMessage) => {
-	const {
-		apiConfiguration,
-		customModePrompts,
-		customInstructions,
-		browserViewportSize,
-		diffEnabled,
-		mcpEnabled,
-		fuzzyMatchThreshold,
-		experiments,
-		enableMcpServerCreation,
-		browserToolEnabled,
-		language,
-	} = await provider.getState()
-
-	const diffStrategy = new MultiSearchReplaceDiffStrategy(fuzzyMatchThreshold)
-
-	const cwd = provider.cwd
-
-	const mode = message.mode ?? defaultModeSlug
-	const customModes = await provider.customModesManager.getCustomModes()
-
-	const rooIgnoreInstructions = provider.getCurrentCline()?.rooIgnoreController?.getInstructions()
-
-	// Determine if browser tools can be used based on model support, mode, and user settings
-	let modelSupportsComputerUse = false
-
-	// Create a temporary API handler to check if the model supports computer use
-	// This avoids relying on an active Cline instance which might not exist during preview
-	try {
-		const tempApiHandler = buildApiHandler(apiConfiguration)
-		modelSupportsComputerUse = tempApiHandler.getModel().info.supportsComputerUse ?? false
-	} catch (error) {
-		console.error("Error checking if model supports computer use:", error)
-	}
-
-	// Check if the current mode includes the browser tool group
-	const modeConfig = getModeBySlug(mode, customModes)
-	const modeSupportsBrowser = modeConfig?.groups.some((group) => getGroupName(group) === "browser") ?? false
-
-	// Only enable browser tools if the model supports it, the mode includes browser tools,
-	// and browser tools are enabled in settings
-	const canUseBrowserTool = modelSupportsComputerUse && modeSupportsBrowser && (browserToolEnabled ?? true)
-
-	const systemPrompt = await SYSTEM_PROMPT(
-		provider.context,
-		cwd,
-		canUseBrowserTool,
-		mcpEnabled ? provider.getMcpHub() : undefined,
-		diffStrategy,
-		browserViewportSize ?? "900x600",
-		mode,
-		customModePrompts,
-		customModes,
-		customInstructions,
-		diffEnabled,
-		experiments,
-		enableMcpServerCreation,
-		language,
-		rooIgnoreInstructions,
-	)
-
-	return systemPrompt
 }
