@@ -16,7 +16,7 @@ const HistoryPreview = () => {
 			<div className="flex flex-col gap-3">
 				{tasks.length !== 0 && (
 					<>
-						{tasks.slice(0, 3).map((item) => (
+						{tasks.slice(0, 6).map((item) => (
 							<div
 								key={item.id}
 								className="bg-vscode-editor-background rounded relative overflow-hidden cursor-pointer border border-vscode-toolbar-hoverBackground/30 hover:border-vscode-toolbar-hoverBackground/60"
