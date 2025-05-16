@@ -1,17 +1,24 @@
-import React, { FC, memo, MouseEvent } from "react" // Ensure MouseEvent is imported
+import React, { FC, memo, MouseEvent } from "react"
 import ReactMarkdown, { Options } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { cn } from "@/lib/utils"
-import { vscode } from "@src/utils/vscode" // vscode import should already be here from previous attempt
+import { vscode } from "@src/utils/vscode"
 
 import { Separator } from "@/components/ui"
 
 import { CodeBlock } from "./CodeBlock"
 import { Blockquote } from "./Blockquote"
 
-const MemoizedReactMarkdown: FC<Options> = memo(
+const MemoizedReactMarkdown: FC<Options & { isComplete?: boolean }> = memo(
 	ReactMarkdown,
-	(prevProps, nextProps) => prevProps.children === nextProps.children && prevProps.className === nextProps.className,
+	(prevProps: Options & { isComplete?: boolean }, nextProps: Options & { isComplete?: boolean }) => {
+		// Compare children, className, and isComplete
+		const childrenEqual = prevProps.children === nextProps.children
+		const classNameEqual = prevProps.className === nextProps.className
+		const isCompleteEqual = prevProps.isComplete === nextProps.isComplete
+		// Only skip rendering if all relevant props are equal
+		return childrenEqual && classNameEqual && isCompleteEqual
+	},
 )
 
 export function Markdown({ content, isComplete }: { content: string; isComplete?: boolean }) {
@@ -19,6 +26,7 @@ export function Markdown({ content, isComplete }: { content: string; isComplete?
 	return (
 		<MemoizedReactMarkdown
 			remarkPlugins={[remarkGfm]}
+			isComplete={isComplete}
 			className="custom-markdown break-words text-[var(--vscode-font-size)]"
 			components={{
 				p({ children }) {
@@ -139,7 +147,6 @@ export function Markdown({ content, isComplete }: { content: string; isComplete?
 	)
 }
 
-// Define the helper function
 const handleLinkClick = (event: MouseEvent<HTMLAnchorElement>, href: string | undefined) => {
 	if (!href) {
 		return

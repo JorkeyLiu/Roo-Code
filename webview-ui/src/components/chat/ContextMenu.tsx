@@ -5,9 +5,9 @@ import {
 	// getContextMenuOptions, // Hide built-in mode: Remove unused import
 	// SearchResult, // Hide built-in mode: Remove unused import
 } from "@src/utils/context-mentions"
-import { removeLeadingNonAlphanumeric } from "../common/CodeAccordian"
 // import { ModeConfig } from "@roo/shared/modes" // Hide built-in mode: Remove unused import
 import { getIconForFilePath, getIconUrlByName, getIconForDirectoryPath } from "vscode-material-icons"
+import { removeLeadingNonAlphanumeric } from "@src/utils/removeLeadingNonAlphanumeric"
 
 interface ContextMenuProps {
 	onSelect: (type: ContextMenuOptionType, value?: string) => void

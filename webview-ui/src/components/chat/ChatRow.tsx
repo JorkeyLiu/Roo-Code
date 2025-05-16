@@ -12,10 +12,12 @@ import { useCopyToClipboard } from "@src/utils/clipboard"
 import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { findMatchingResourceOrTemplate } from "@src/utils/mcp"
 import { vscode } from "@src/utils/vscode"
+import { removeLeadingNonAlphanumeric } from "@src/utils/removeLeadingNonAlphanumeric"
 import { Button } from "@src/components/ui"
 
-import CodeAccordian, { removeLeadingNonAlphanumeric } from "../common/CodeAccordian"
-import CodeBlock, { CODE_BLOCK_BG_COLOR } from "../common/CodeBlock"
+import { ToolUseBlock, ToolUseBlockHeader } from "../common/ToolUseBlock"
+import CodeAccordian from "../common/CodeAccordian"
+import CodeBlock from "../common/CodeBlock"
 import { ReasoningBlock } from "./ReasoningBlock"
 import Thumbnails from "../common/Thumbnails"
 import McpResourceRow from "../mcp/McpResourceRow"
@@ -79,73 +81,68 @@ const ChatRow = memo(
 export default ChatRow
 
 // Define the new wrapper component with copy functionality
-const MarkdownWithCopy = memo(
-	({ content, partial, isComplete }: { content: string; partial?: boolean; isComplete: boolean }) => {
-		// Added isComplete prop
-		const [isHovering, setIsHovering] = useState(false)
-		// Assuming useCopyToClipboard is imported correctly (it is, line 5)
-		const { copyWithFeedback } = useCopyToClipboard(200) // Use shorter feedback duration like original
+const MarkdownWithCopy = memo(({ content, partial }: { content: string; partial?: boolean }) => {
+	const [isHovering, setIsHovering] = useState(false)
+	// Assuming useCopyToClipboard is imported correctly (it is, line 5)
+	const { copyWithFeedback } = useCopyToClipboard(200) // Use shorter feedback duration like original
 
-		return (
-			<div
-				onMouseEnter={() => setIsHovering(true)}
-				onMouseLeave={() => setIsHovering(false)}
-				style={{ position: "relative" }}>
-				{/* Apply negative margins and text wrap styles */}
-				<div style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
-					{/* Use the imported shared Markdown component */}
-					{/* Pass isComplete down to Markdown */}
-					<Markdown content={content} isComplete={isComplete} />
-				</div>
-				{/* Conditional Copy Button */}
-				{content && !partial && isHovering && (
-					<div
-						style={{
-							position: "absolute",
-							bottom: "-4px",
-							right: "8px",
-							opacity: 0,
-							animation: "fadeIn 0.2s ease-in-out forwards",
-							borderRadius: "4px",
-						}}>
-						<style>
-							{`
+	return (
+		<div
+			onMouseEnter={() => setIsHovering(true)}
+			onMouseLeave={() => setIsHovering(false)}
+			style={{ position: "relative" }}>
+			{/* Apply negative margins and text wrap styles */}
+			<div style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
+				<Markdown content={content} isComplete={!partial} />
+			</div>
+			{/* Conditional Copy Button */}
+			{content && !partial && isHovering && (
+				<div
+					style={{
+						position: "absolute",
+						bottom: "-4px",
+						right: "8px",
+						opacity: 0,
+						animation: "fadeIn 0.2s ease-in-out forwards",
+						borderRadius: "4px",
+					}}>
+					<style>
+						{`
               @keyframes fadeIn {
                 from { opacity: 0; }
                 to { opacity: 1.0; }
               }
             `}
-						</style>
-						<VSCodeButton
-							className="copy-button"
-							appearance="icon"
-							style={{
-								height: "24px",
-								border: "none",
-								background: "var(--vscode-editor-background)",
-								transition: "background 0.2s ease-in-out",
-							}}
-							onClick={async () => {
-								const success = await copyWithFeedback(content) // Use content prop
-								if (success) {
-									const button = document.activeElement as HTMLElement
-									if (button) {
-										button.style.background = "var(--vscode-button-background)"
-										setTimeout(() => {
-											button.style.background = ""
-										}, 200)
-									}
+					</style>
+					<VSCodeButton
+						className="copy-button"
+						appearance="icon"
+						style={{
+							height: "24px",
+							border: "none",
+							background: "var(--vscode-editor-background)",
+							transition: "background 0.2s ease-in-out",
+						}}
+						onClick={async () => {
+							const success = await copyWithFeedback(content) // Use content prop
+							if (success) {
+								const button = document.activeElement as HTMLElement
+								if (button) {
+									button.style.background = "var(--vscode-button-background)"
+									setTimeout(() => {
+										button.style.background = ""
+									}, 200)
 								}
-							}}
-							title="Copy as markdown">
-							<span className="codicon codicon-copy"></span>
-						</VSCodeButton>
-					</div>
-				)}
-			</div>
-		)
-	},
-)
+							}
+						}}
+						title="Copy as markdown">
+						<span className="codicon codicon-copy"></span>
+					</VSCodeButton>
+				</div>
+			)}
+		</div>
+	)
+})
 
 export const ChatRowContent = ({
 	message,
@@ -436,10 +433,11 @@ export const ChatRowContent = ({
 							</span>
 						</div>
 						<CodeAccordian
+							path={tool.path}
+							code={tool.content ?? tool.diff}
+							language={tool.tool === "appliedDiff" ? "diff" : undefined}
 							progressStatus={message.progressStatus}
 							isLoading={message.partial}
-							diff={tool.diff!}
-							path={tool.path!}
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
 						/>
@@ -461,10 +459,11 @@ export const ChatRowContent = ({
 							</span>
 						</div>
 						<CodeAccordian
+							path={tool.path}
+							code={tool.diff}
+							language="diff"
 							progressStatus={message.progressStatus}
 							isLoading={message.partial}
-							diff={tool.diff!}
-							path={tool.path!}
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
 						/>
@@ -482,10 +481,10 @@ export const ChatRowContent = ({
 							</span>
 						</div>
 						<CodeAccordian
+							path={tool.path}
+							code={tool.diff}
 							progressStatus={message.progressStatus}
 							isLoading={message.partial}
-							diff={tool.diff!}
-							path={tool.path!}
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
 						/>
@@ -499,9 +498,9 @@ export const ChatRowContent = ({
 							<span style={{ fontWeight: "bold" }}>{t("chat:fileOperations.wantsToCreate")}</span>
 						</div>
 						<CodeAccordian
+							path={tool.path}
+							code={tool.content}
 							isLoading={message.partial}
-							code={tool.content!}
-							path={tool.path!}
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
 						/>
@@ -520,47 +519,21 @@ export const ChatRowContent = ({
 									: t("chat:fileOperations.didRead")}
 							</span>
 						</div>
-						<div
-							style={{
-								borderRadius: 3,
-								backgroundColor: CODE_BLOCK_BG_COLOR,
-								overflow: "hidden",
-								border: "1px solid var(--vscode-editorGroup-border)",
-							}}>
-							<div
-								style={{
-									color: "var(--vscode-descriptionForeground)",
-									display: "flex",
-									alignItems: "center",
-									padding: "9px 10px",
-									cursor: "pointer",
-									userSelect: "none",
-									WebkitUserSelect: "none",
-									MozUserSelect: "none",
-									msUserSelect: "none",
-								}}
-								onClick={() => {
-									vscode.postMessage({ type: "openFile", text: tool.content })
-								}}>
+						<ToolUseBlock>
+							<ToolUseBlockHeader
+								onClick={() => vscode.postMessage({ type: "openFile", text: tool.content })}>
 								{tool.path?.startsWith(".") && <span>.</span>}
-								<span
-									style={{
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-										marginRight: "8px",
-										direction: "rtl",
-										textAlign: "left",
-									}}>
+								<span className="whitespace-nowrap overflow-hidden text-ellipsis text-left mr-2 rtl">
 									{removeLeadingNonAlphanumeric(tool.path ?? "") + "\u200E"}
 									{tool.reason}
 								</span>
 								<div style={{ flexGrow: 1 }}></div>
 								<span
 									className={`codicon codicon-link-external`}
-									style={{ fontSize: 13.5, margin: "1px 0" }}></span>
-							</div>
-						</div>
+									style={{ fontSize: 13.5, margin: "1px 0" }}
+								/>
+							</ToolUseBlockHeader>
+						</ToolUseBlock>
 					</>
 				)
 			case "fetchInstructions":
@@ -571,8 +544,8 @@ export const ChatRowContent = ({
 							<span style={{ fontWeight: "bold" }}>{t("chat:instructions.wantsToFetch")}</span>
 						</div>
 						<CodeAccordian
+							code={tool.content}
 							isLoading={message.partial}
-							code={tool.content!}
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
 						/>
@@ -590,8 +563,8 @@ export const ChatRowContent = ({
 							</span>
 						</div>
 						<CodeAccordian
-							code={tool.content!}
-							path={tool.path!}
+							path={tool.path}
+							code={tool.content}
 							language="shell-session"
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
@@ -610,8 +583,8 @@ export const ChatRowContent = ({
 							</span>
 						</div>
 						<CodeAccordian
-							code={tool.content!}
-							path={tool.path!}
+							path={tool.path}
+							code={tool.content}
 							language="shell-session"
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
@@ -630,8 +603,8 @@ export const ChatRowContent = ({
 							</span>
 						</div>
 						<CodeAccordian
-							code={tool.content!}
-							path={tool.path!}
+							path={tool.path}
+							code={tool.content}
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
 						/>
@@ -659,8 +632,8 @@ export const ChatRowContent = ({
 							</span>
 						</div>
 						<CodeAccordian
-							code={tool.content!}
 							path={tool.path! + (tool.filePattern ? `/(${tool.filePattern})` : "")}
+							code={tool.content}
 							language="log"
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
@@ -1001,11 +974,7 @@ export const ChatRowContent = ({
 				case "text":
 					return (
 						<div>
-							<MarkdownWithCopy
-								content={message.text || ""}
-								partial={message.partial}
-								isComplete={!message.partial}
-							/>
+							<MarkdownWithCopy content={message.text || ""} partial={message.partial} />
 						</div>
 					)
 				case "user_feedback":
@@ -1081,13 +1050,10 @@ export const ChatRowContent = ({
 				case "user_feedback_diff":
 					const tool = safeJsonParse<ClineSayTool>(message.text)
 					return (
-						<div
-							style={{
-								marginTop: -10,
-								width: "100%",
-							}}>
+						<div style={{ marginTop: -10, width: "100%" }}>
 							<CodeAccordian
-								diff={tool?.diff!}
+								code={tool?.diff}
+								language="diff"
 								isFeedback={true}
 								isExpanded={isExpanded}
 								onToggleExpand={onToggleExpand}
@@ -1114,11 +1080,7 @@ export const ChatRowContent = ({
 								{title}
 							</div>
 							<div style={{ color: "var(--vscode-charts-green)", paddingTop: 10 }}>
-								<MarkdownWithCopy
-									content={message.text || ""}
-									partial={message.partial}
-									isComplete={!message.partial}
-								/>
+								<MarkdownWithCopy content={message.text || ""} partial={message.partial} />
 							</div>
 						</>
 					)
@@ -1165,11 +1127,7 @@ export const ChatRowContent = ({
 								</div>
 							)}
 							<div style={{ paddingTop: 10 }}>
-								<MarkdownWithCopy
-									content={message.text || ""}
-									partial={message.partial}
-									isComplete={!message.partial}
-								/>
+								<MarkdownWithCopy content={message.text || ""} partial={message.partial} />
 							</div>
 						</>
 					)
@@ -1188,13 +1146,12 @@ export const ChatRowContent = ({
 					)
 				case "command":
 					return (
-						<>
-							<div style={headerStyle}>
-								{icon}
-								{title}
-							</div>
-							<CommandExecution executionId={message.ts.toString()} text={message.text} />
-						</>
+						<CommandExecution
+							executionId={message.ts.toString()}
+							text={message.text}
+							icon={icon}
+							title={title}
+						/>
 					)
 				case "use_mcp_server":
 					const useMcpServer = safeJsonParse<ClineAskUseMcpServer>(message.text)

@@ -143,14 +143,14 @@ export function getContextMenuOptions(
 					type: ContextMenuOptionType.Mode,
 					value: result.item.original.slug,
 					label: result.item.original.name,
-					description: result.item.original.roleDefinition.split("\n")[0],
+					description: (result.item.original.whenToUse || result.item.original.roleDefinition).split("\n")[0],
 				}))
 			: // Use visible modes for non-query case as well
 				visibleModes.map((mode) => ({
 					type: ContextMenuOptionType.Mode,
 					value: mode.slug,
 					label: mode.name,
-					description: mode.roleDefinition.split("\n")[0],
+					description: (mode.whenToUse || mode.roleDefinition).split("\n")[0],
 				}))
 
 		return matchingModes.length > 0 ? matchingModes : [{ type: ContextMenuOptionType.NoResults }]

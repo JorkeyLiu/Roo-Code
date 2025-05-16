@@ -46,7 +46,7 @@ describe("ChatTextArea", () => {
 		inputValue: "",
 		setInputValue: jest.fn(),
 		onSend: jest.fn(),
-		textAreaDisabled: false,
+		sendingDisabled: false,
 		selectApiConfigDisabled: false,
 		onSelectImages: jest.fn(),
 		shouldDisableImages: false,
@@ -73,13 +73,13 @@ describe("ChatTextArea", () => {
 	})
 
 	describe("enhance prompt button", () => {
-		it("should be disabled when textAreaDisabled is true", () => {
+		it("should be disabled when sendingDisabled is true", () => {
 			;(useExtensionState as jest.Mock).mockReturnValue({
 				filePaths: [],
 				openedTabs: [],
 				hiddenBuiltInModes: [],
 			})
-			render(<ChatTextArea {...defaultProps} textAreaDisabled={true} />)
+			render(<ChatTextArea {...defaultProps} sendingDisabled={true} />)
 			const enhanceButton = getEnhancePromptButton()
 			expect(enhanceButton).toHaveClass("cursor-not-allowed")
 		})
@@ -422,13 +422,13 @@ describe("ChatTextArea", () => {
 		const getApiConfigDropdown = () => {
 			return screen.getByTitle("chat:selectApiConfig")
 		}
-		it("should be enabled independently of textAreaDisabled", () => {
-			render(<ChatTextArea {...defaultProps} textAreaDisabled={true} selectApiConfigDisabled={false} />)
+		it("should be enabled independently of sendingDisabled", () => {
+			render(<ChatTextArea {...defaultProps} sendingDisabled={true} selectApiConfigDisabled={false} />)
 			const apiConfigDropdown = getApiConfigDropdown()
 			expect(apiConfigDropdown).not.toHaveAttribute("disabled")
 		})
 		it("should be disabled when selectApiConfigDisabled is true", () => {
-			render(<ChatTextArea {...defaultProps} textAreaDisabled={true} selectApiConfigDisabled={true} />)
+			render(<ChatTextArea {...defaultProps} sendingDisabled={true} selectApiConfigDisabled={true} />)
 			const apiConfigDropdown = getApiConfigDropdown()
 			expect(apiConfigDropdown).toHaveAttribute("disabled")
 		})
