@@ -22,7 +22,6 @@ import {
 	getMcpServersSection,
 	getToolUseGuidelinesSection,
 	getCapabilitiesSection,
-	getModesSection,
 	addCustomInstructions,
 	markdownFormattingSection,
 } from "./sections"
@@ -57,8 +56,7 @@ async function generatePrompt(
 	const modeConfig = getModeBySlug(mode, customModeConfigs) || modes.find((m) => m.slug === mode) || modes[0]
 	const roleDefinition = promptComponent?.roleDefinition || modeConfig.roleDefinition
 
-	const [modesSection, mcpServersSection] = await Promise.all([
-		getModesSection(context),
+	const [mcpServersSection] = await Promise.all([
 		modeConfig.groups.some((groupEntry) => getGroupName(groupEntry) === "mcp")
 			? getMcpServersSection(mcpHub, effectiveDiffStrategy, enableMcpServerCreation)
 			: Promise.resolve(""),
@@ -86,8 +84,6 @@ ${getToolUseGuidelinesSection()}
 ${mcpServersSection}
 
 ${getCapabilitiesSection(cwd, supportsComputerUse, mcpHub, effectiveDiffStrategy)}
-
-${modesSection}
 
 ${getRulesSection(cwd, supportsComputerUse, effectiveDiffStrategy)}
 
